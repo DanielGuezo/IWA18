@@ -1,7 +1,3 @@
-import { html, createOrderHtml, moveToColumn, updateDraggingHtml } from "./view.js";
-import { createOrderData, state, updateDragging } from "./data.js";
-
-const orders = []
 /**
  * A handler that fires when a user drags over any element inside a column. In
  * order to determine which column the user is dragging over the entire event
@@ -11,177 +7,117 @@ const orders = []
  * active dragging column is set in the `state` object in "data.js" and the HTML
  * is updated to reflect the new column.
  *
- * @param {Event} event 
+ * @param {Event} event
  */
+
+import * as datafile from "./data.js";
+import * as view from "./view.js";
+
 const handleDragOver = (event) => {
-    event.preventDefault();
-    const path = event.path || event.composedPath()
-    let column = null
+  event.preventDefault();
+  const path = event.path || event.composedPath();
+  let column = null;
 
-    for (const element of path) {
-        const { area } = element.dataset
-        if (area) {
-            column = area
-            break;
-        }
+  for (const element of path) {
+    const { area } = element.dataset;
+    if (area) {
+      column = area;
+      break;
     }
+  }
 
-    if (!column) return
-    updateDragging({ over: column })
-    updateDraggingHtml({ over: column })
-}
-
-const handleDragStart = (event) => {
-    event.preventDefault();
-
-    // event.target.classList.add('dragging');
-
-}
-
-const handleDragEnd = (event) => {
-    event.preventDefault();
-
-    // event.target.classList.remove('dragging');
-}
-
-
-const handleHelpToggle = (event) => {
-    event.preventDefault()
-    const target = event.target
-    const helpOverlay = html.help.overlay
-    switch (target) {
-        case html.other.help:
-            helpOverlay.setAttribute('open', 'open')
-            break
-        case html.help.cancel: {
-          helpOverlay.removeAttribute('open')  
-          html.other.add.focus()
-    }
-        break
-    };
-}
-
-const handleAddToggle = (event) => {
-    event.preventDefault()
-    const target = event.target
-    const orderOverlay = html.add.overlay
-    switch (target) {
-        case html.other.add:
-            orderOverlay.setAttribute('open', 'open')
-            break
-        case html.add.cancel: {
-            orderOverlay.removeAttribute('open')
-            const titleInput = document.querySelector('[data-add-title]')
-            titleInput.value = ''
-            const tableInput = document.querySelector('[data-add-table]')
-            tableInput.value = '1'
-            html.other.add.focus()
-        }
-            break
-    };
+  if (!column) return;
+  updateDragging({ over: column });
+  updateDraggingHtml({ over: column });
 };
 
+const handleDragStart = (event) => {};
+const handleDragEnd = (event) => {};
+
+//Opens & closes help overlay
+const handleHelpToggle = (event) => {
+  if (view.html.help.overlay.open) {
+    view.html.help.overlay.close();
+    view.html.other.add.focus(); //4
+  } else {
+    view.html.help.overlay.show();
+  }
+};
+
+//Opens & closes add order overlay and makes form blank ones you cancel order
+const handleAddToggle = (event) => {
+  if (view.html.add.overlay.open) {
+    view.html.add.overlay.close();
+    view.html.other.add.focus(); //4
+  } else {
+    view.html.add.overlay.show();
+    view.html.add.form.reset();
+  }
+};
+
+//Adds order to html element
 const handleAddSubmit = (event) => {
-    event.preventDefault()
-    const data = new FormData(event.target)
-    let title = data.get('title')
-    let table = data.get('table')
-    const column = 'ordered'
-    const order = createOrderData({title, table, column})
+  event.preventDefault();
+  const title = view.html.add.title.value;
+  const table = view.html.add.table.value;
+  const order = datafile.createOrderData({ title, table, column: "ordered" });
+  datafile.state.orders[order.id] = order;
+  const orderElement = view.createOrderHtml(order);
+  view.html.columns.ordered.appendChild(orderElement);
+  view.html.add.overlay.close();
+};
 
-    const orderHtml = createOrderHtml(order)
-    console.log(orderHtml)
-    html.columns.ordered.appendChild(orderHtml)
-        
-    const titleInput = document.querySelector('[data-add-title]')
-    titleInput.value = ''
-    const tableInput = document.querySelector('[data-add-table]')
-    tableInput.value = '1'
-    const submitOverlay = html.add.overlay
-    submitOverlay.removeAttribute('open')
-    html.other.add.focus()
-}
-
-// can you hear me?
-
+//Edit Order Overlay opens and closes without changes
 const handleEditToggle = (event) => {
-    event.preventDefault()
-    // event.dataTransfer.setData('id', document.querySelector('[data-id]') )
-    const editTarget = event.target
-    const editOrder = html.edit.overlay
-    orders.push(editTarget.getAttribute('data-id'))
+  if (view.html.edit.overlay.open) {
+    view.html.edit.overlay.close();
+  } else {
+    view.html.edit.overlay.show();
+  }
+};
 
-
-    switch (editTarget) {
-        case html.edit.cancel: {
-            editOrder.removeAttribute('open')       
-            html.other.add.focus()  
-        }
-        break
-
-        default:{           
-            html.edit.overlay.setAttribute('open', 'open')
-            const title = document.getElementById('edit-form').children.item(1).children.item(1)
-            const tableSelection = document.getElementById('edit-form').children.item(2).children.item(1)      
-            const statusSelection = document.getElementById('edit-form').children.item(3).children.item(1)
-            title.setAttribute('value', event.target.querySelector('.order__title').innerText)
-
-            tableSelection.options[event.target.querySelector('.order__value').innerText - 1].selected = true
-            statusSelection.options[event.target.querySelector('.order__time').innerText].selected = true
-        }
-    };
-}
-
+//Update edit submission and add columns to order/prep/serve
 const handleEditSubmit = (event) => {
-    event.preventDefault()
-    const editData = new FormData(event.target)
-    let title = editData.get('title')
-    let table = editData.get('table')
-    let column = editData.get('column')
+  event.preventDefault();
+  const order = document.querySelector(".order");
+  order.remove();
 
-    if(event.target){
-        const orderParentElement = document.querySelector('[data-id]')
-        const orderTitle = orderParentElement.children.item(0)
-        orderTitle.innerHTML = title
-        const orderTable = orderParentElement.children.item(1).children.item(0).children.item(1)
-        orderTable.innerHTML = table
+  const title = view.html.edit.title.value;
+  const table = view.html.edit.table.value;
+  const column = view.html.edit.column.value;
+  const orderEdit = datafile.createOrderData({ title, table, column });
+  datafile.state.orders[orderEdit.id] = orderEdit;
+  const orderElement = view.createOrderHtml(orderEdit);
+  view.html.columns[column].appendChild(orderElement);
+  view.html.edit.overlay.close();
+};
 
-        moveToColumn(orders[0], column)
-        orders.pop()
-    }
-
-    const submitOverlay = html.edit.overlay
-    submitOverlay.removeAttribute('open')
-    html.other.add.focus()
-}
-
+// Deletes order
 const handleDelete = (event) => {
-    event.preventDefault()
-    const item = document.querySelector('[data-id]')    
-    item.remove()
+  const { target } = event;
+  if (target == view.html.edit.delete) {
+    document.querySelector(".order").remove();
+  }
+  view.html.edit.overlay.close();
+};
 
-    const editOverlay = html.edit.overlay
-    editOverlay.removeAttribute('open')
-    html.other.add.focus()
+view.html.add.cancel.addEventListener("click", handleAddToggle);
+view.html.other.add.addEventListener("click", handleAddToggle);
+view.html.add.form.addEventListener("submit", handleAddSubmit);
+
+view.html.other.grid.addEventListener("click", handleEditToggle);
+view.html.edit.cancel.addEventListener("click", handleEditToggle);
+view.html.edit.form.addEventListener("submit", handleEditSubmit);
+view.html.edit.delete.addEventListener("click", handleDelete);
+
+view.html.other.help.addEventListener("click", handleHelpToggle);
+view.html.help.cancel.addEventListener("click", handleHelpToggle);
+
+for (const htmlColumn of Object.values(view.html.columns)) {
+  htmlColumn.addEventListener("dragstart", handleDragStart);
+  htmlColumn.addEventListener("dragend", handleDragEnd);
 }
 
-html.add.cancel.addEventListener('click', handleAddToggle)
-html.other.add.addEventListener('click', handleAddToggle)
-html.add.form.addEventListener('submit', handleAddSubmit)
-
-html.other.grid.addEventListener('click', handleEditToggle)
-html.edit.cancel.addEventListener('click', handleEditToggle)
-html.edit.form.addEventListener('submit', handleEditSubmit)
-html.edit.delete.addEventListener('click', handleDelete)
-
-html.help.cancel.addEventListener('click', handleHelpToggle)
-html.other.help.addEventListener('click', handleHelpToggle)
-
-for (const htmlColumn of Object.values(html.columns)) {
-    htmlColumn.addEventListener('dragstart', handleDragStart)
-    htmlColumn.addEventListener('dragend', handleDragEnd)
-}
-
-for (const htmlArea of Object.values(html.area)) {
-    htmlArea.addEventListener('dragover', handleDragOver)
+for (const htmlArea of Object.values(view.html.area)) {
+  htmlArea.addEventListener("dragover", handleDragOver);
 }
